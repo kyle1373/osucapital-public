@@ -1,0 +1,1 @@
+alter table "public"."seasons" alter column "color_code" set default '#777777'::text;
