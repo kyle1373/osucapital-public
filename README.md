@@ -1,3 +1,18 @@
+# NOTE: THIS IS A PUBLIC, UNUPDATED VERSION OF OSU! CAPITAL'S REPO
+The purpose of open-sourcing this stale version of osu! capital is so recruiters and hiring managers can view my work. In any case if you're reading this, welcome!
+
+osu! capital currently has 100,000 users who trade on the platform actively. 
+
+Some social media URLs:
+https://www.reddit.com/r/osugame/comments/19bhc8h/osu_capital_is_now_live/  
+https://www.reddit.com/r/osugame/comments/18ubbqt/wip_currently_creating_an_osu_stock_market/  
+https://www.reddit.com/r/osugame/comments/1971bep/the_osu_stock_market_will_open_in_3_days/  
+
+I'm currently developing the site as you're reading this, but the progress is not being reflected on this repo. Regardless, feel free to poke around the repo in case you're interested! I'm leaving the original repo documentation down below:
+
+
+
+
 # osu-capital
 
 ![image](https://github.com/kyle1373/osu-capital/assets/59634395/c4467abc-66f9-4f4d-9a1f-cc247b6d990c)
