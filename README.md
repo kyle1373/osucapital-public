@@ -1,7 +1,7 @@
 # NOTE: THIS IS A PUBLIC, UNUPDATED VERSION OF OSU! CAPITAL'S REPO
 The purpose of open-sourcing this stale version of osu! capital is so recruiters and hiring managers can view my work. In any case if you're reading this, welcome!
 
-osu! capital currently has 100,000 users who trade on the platform actively. 
+osu! capital currently has 10,000 users who trade on the platform actively. 
 
 Some social media URLs:
 https://www.reddit.com/r/osugame/comments/19bhc8h/osu_capital_is_now_live/  
