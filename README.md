@@ -15,8 +15,6 @@ I'm currently developing the site as you're reading this, but the progress is no
 
 # osu-capital
 
-![image](https://github.com/kyle1373/osu-capital/assets/59634395/c4467abc-66f9-4f4d-9a1f-cc247b6d990c)
-
 NOTE: This repo is changing frequently. Some documentation may be outdated. Contact `superfx64` (aka Kyle) on Discord if you see any.
 
 The codebase for osu! capital: a stock market for osu! players. Invest into osu! players with unconvertible currency where their share price is calculated through player performance statistics.
