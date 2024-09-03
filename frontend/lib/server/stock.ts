@@ -1,10 +1,12 @@
-import { COINS, LIMIT } from "@constants/constants";
+import { COINS, LIMIT, SETTINGS } from "@constants/constants";
 import osuClient from "@lib/osuClient";
 import supabaseAdmin from "@lib/supabase/supabase";
 import {
   calculateBuyTax,
   calculateIfStockCanBeBought,
   calculateIfStockCanBeSold,
+  checkRebalance,
+  getCleanErrorMessage,
   isAfterMinutes,
   monthlyPlaycountEntry,
   sleep,
@@ -36,16 +38,29 @@ export interface StockStats {
   prevent_trades: boolean | null;
   osu_playcount_history: monthlyPlaycountEntry[] | null;
   osu_join_date: string | null;
+  is_banned: boolean;
 }
 
-// TODO: convert all errors to promise catching and handle it outside of this function too
+export const checkIfTraderExists = async (userId: number): Promise<boolean> => {
+  const { data, error } = await supabaseAdmin
+    .from("users")
+    .select("user_id")
+    .eq("user_id", userId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data.length > 0;
+};
+
 export const getStockStats = async (
   stock_id: number,
   user_id: number
 ): Promise<StockStats> => {
   const stockStats = await supabaseAdmin.rpc("get_stock_stats", {
     p_stock_id: stock_id,
-    p_user_id: user_id,
+    p_user_id: user_id ?? 0,
   });
 
   if (stockStats.error) {
@@ -59,20 +74,16 @@ export const getStockStats = async (
   let formattedData: StockStats =
     stockStats.data.length > 0 ? stockStats.data[0] : null;
 
+  if (SETTINGS.SeasonClosed && !formattedData) {
+    return null;
+  }
+
   if (!formattedData) {
     try {
-      const { osuUser, stockPrice } = await refreshStock(stock_id);
-
-      if (stockPrice) {
-        const resp2 = await supabaseAdmin.from("stocks_history").insert({
-          stock_id: stock_id,
-          price: stockPrice,
-        });
-
-        if (resp2.error) {
-          throw new Error(resp2.error.message);
-        }
-      }
+      await refreshStock({
+        stock_id,
+        log_history_if_new: true,
+      });
     } catch (e) {
       console.error(
         "CAUGHT ERROR IN getStockStats for stock_id " +
@@ -98,25 +109,28 @@ export const getStockStats = async (
     formattedData = repulledStockStats.data as StockStats;
   } else if (
     isAfterMinutes(formattedData.last_updated, LIMIT.UpdateStockViewMinutes) &&
-    !formattedData.prevent_trades
+    !formattedData.prevent_trades &&
+    !SETTINGS.SeasonClosed
   ) {
     try {
-      const { osuUser, stockPrice, canBuyStock, canSellStock } =
-        await refreshStock(stock_id);
+      const { osuUser, stockPrice, canBuyStock, canSellStock, isBanned } =
+        await refreshStock({ stock_id });
 
-      formattedData = {
-        ...formattedData,
-        share_price: stockPrice,
-        osu_name: osuUser?.username,
-        osu_picture: osuUser?.avatar_url,
-        osu_rank: osuUser?.statistics?.global_rank,
-        osu_pp: osuUser?.statistics?.pp,
-        osu_rank_history: osuUser?.rankHistory.data,
-        osu_join_date: osuUser?.join_date,
-        osu_playcount_history: osuUser?.monthly_playcounts,
-        is_buyable: canBuyStock,
-        is_sellable: canSellStock,
-      };
+      if (!isBanned) {
+        formattedData = {
+          ...formattedData,
+          share_price: stockPrice,
+          osu_name: osuUser?.username ?? null,
+          osu_picture: osuUser?.avatar_url ?? null,
+          osu_rank: osuUser?.statistics?.global_rank ?? null,
+          osu_pp: osuUser?.statistics?.pp ?? null,
+          osu_rank_history: osuUser?.rankHistory?.data ?? null,
+          osu_join_date: osuUser?.join_date ?? null,
+          osu_playcount_history: osuUser?.monthly_playcounts ?? null,
+          is_buyable: canBuyStock ?? null,
+          is_sellable: canSellStock ?? null,
+        };
+      }
     } catch (e) {
       console.error(
         "CAUGHT ERROR IN getStockStats for stock_id " +
@@ -141,12 +155,18 @@ export const getStockStats = async (
     };
   });
 
-  formattedPriceHistory.push({
-    date: "Today",
-    price: formattedData.share_price,
-  });
+  if (formattedData.share_price) {
+    formattedPriceHistory.push({
+      date: "Today",
+      price: formattedData.share_price,
+    });
+  }
 
   formattedData.share_price_history = formattedPriceHistory;
+
+  if (SETTINGS.SeasonClosed) {
+    formattedData.prevent_trades = true;
+  }
 
   return formattedData;
 };
@@ -155,31 +175,6 @@ export const getUserStocks = async (
   user_id: number,
   page: number
 ): Promise<{ stocks: StockStats[]; canPullMore: boolean }> => {
-  if (page === 1) {
-    // TODO: Optimize this. We're doing double pulls when we could only be doing one.
-    // The first pull just refreshes the stocks, but somehow we should just return this data lol
-    const pulledAllStocks = await supabaseAdmin
-      .from("users_stocks")
-      .select("stock_id, stocks(stock_id, last_updated, prevent_trades)")
-      .eq("user_id", user_id);
-    if (pulledAllStocks.error) {
-      throw new Error("ERROR2: " + JSON.stringify(pulledAllStocks.error));
-    }
-
-    const allStockIds = [];
-
-    for (var userStock of pulledAllStocks.data) {
-      const stock: any = userStock.stocks;
-      if (
-        isAfterMinutes(stock.last_updated, LIMIT.UpdateStockBatchViewMinutes) &&
-        !stock.prevent_trades
-      ) {
-        allStockIds.push(stock.stock_id);
-      }
-    }
-
-    await refreshStocks(allStockIds);
-  }
   const limit = 10;
 
   // Note: this function actually returns limit + 1 items. We use the limit + 1 to determine if there is more items that need to be loaded
@@ -199,33 +194,29 @@ export const getUserStocks = async (
     data.pop();
   }
 
-  const dataRemoveInvalid = data.filter(
-    (stockStat: StockStats) => stockStat.share_price
-  );
-
-  const formattedStocks: StockStats[] = dataRemoveInvalid.map(
-    (stockStat: StockStats) => {
-      const formattedPriceHistory = stockStat.share_price_history.map(
-        (val, index, array) => {
-          return {
-            date:
-              array.length -
-              index +
-              (index === array.length - 1 ? " day ago" : " days ago"),
-            price: val.price,
-          };
-        }
-      );
+  const formattedStocks: StockStats[] = data.map((stockStat: StockStats) => {
+    const formattedPriceHistory = stockStat.share_price_history.map(
+      (val, index, array) => {
+        return {
+          date:
+            array.length -
+            index +
+            (index === array.length - 1 ? " day ago" : " days ago"),
+          price: val.price,
+        };
+      }
+    );
+    if (stockStat.share_price) {
       formattedPriceHistory.push({
         date: "Today",
         price: stockStat.share_price,
       });
-      return {
-        ...stockStat,
-        share_price_history: formattedPriceHistory,
-      };
     }
-  );
+    return {
+      ...stockStat,
+      share_price_history: formattedPriceHistory,
+    };
+  });
 
   return { stocks: formattedStocks, canPullMore: canPullMore };
 };
@@ -242,7 +233,8 @@ export interface StockTradeInfo {
 }
 
 export const getStockTradeHistory = async (
-  stock_id: number
+  stock_id: number,
+  limit: number
 ): Promise<StockTradeInfo[]> => {
   const tradeHistory = await supabaseAdmin
     .from("trades")
@@ -250,7 +242,7 @@ export const getStockTradeHistory = async (
       "user_id, users(osu_name), type, num_shares, timestamp, coins, profit, coins_with_taxes"
     )
     .order("timestamp", { ascending: false }) // Sort by timestamp in descending order
-    .limit(20)
+    .limit(limit)
     .eq("stock_id", stock_id);
 
   if (tradeHistory.error) {
@@ -449,133 +441,70 @@ export function calculateImprovementBonus(rankHistory: number[]) {
   return truncateToTwoDecimals(difference > 200 ? 200 : difference);
 }
 
-export async function refreshStocks(
-  stock_ids: number[],
-  updateTimestamp = true
-) {
-  const chunkSize = 50;
-  const chunks = [];
+export async function refreshTopViews() {
+  const { error } = await supabaseAdmin.rpc("refresh_top_views");
 
-  for (let i = 0; i < stock_ids.length; i += chunkSize) {
-    const chunk = stock_ids.slice(i, i + chunkSize);
-    chunks.push(chunk);
-  }
-
-  const { data: existingRecords, error: fetchError } = await supabaseAdmin
-    .from("stocks")
-    .select("stock_id, osu_name, last_updated, osu_rank_history")
-    .in("stock_id", stock_ids);
-
-  if (fetchError) {
-    throw new Error("ERROR5: " + fetchError.message);
-  }
-
-  const existingRecordsMap = existingRecords.reduce((map, record) => {
-    map[record.stock_id] = record;
-    return map;
-  }, {});
-
-  const newData = [];
-  let chunkCounter = 0;
-
-  for (const chunk of chunks) {
-    if (chunkCounter === 2) {
-      await sleep(1000);
-      chunkCounter = 0;
-    }
-
-    const osuUserDetails = await osuClient.users.details(chunk);
-
-    if (
-      osuUserDetails === null ||
-      osuUserDetails === undefined ||
-      osuUserDetails.hasOwnProperty("error")
-    ) {
-      throw new Error(
-        (osuUserDetails as any)?.error ||
-          "Too many requests or an unknown error occurred"
-      );
-    }
-
-    const osuUserDetailsMap = osuUserDetails.reduce((map, value) => {
-      map[value.id] = value;
-      return map;
-    }, {});
-
-    newData.push(
-      ...chunk
-        .map((stockId) => {
-          const osuUserDetail = osuUserDetailsMap[stockId];
-          if (osuUserDetail) {
-            return {
-              stock_id: osuUserDetail.id,
-              last_updated: updateTimestamp
-                ? new Date(
-                    new Date().getTime() -
-                      LIMIT.UpdateStockBatchViewMinutes * 60000
-                  ).toISOString()
-                : existingRecordsMap[stockId].last_updated,
-              share_price: calculateStockPrice(
-                parseInt(osuUserDetail.statistics_rulesets?.osu?.global_rank),
-                osuUserDetail.statistics_rulesets?.osu?.pp,
-                existingRecordsMap[osuUserDetail.id].osu_rank_history
-              ),
-              osu_name: osuUserDetail.username,
-              osu_picture: osuUserDetail.avatar_url,
-              osu_banner:
-                osuUserDetail?.cover.custom_url || osuUserDetail?.cover.url,
-              osu_rank: osuUserDetail.statistics_rulesets?.osu?.global_rank,
-              osu_pp: osuUserDetail.statistics_rulesets?.osu?.pp,
-              osu_rank_history:
-                existingRecordsMap[osuUserDetail.id].osu_rank_history,
-              osu_country_code: osuUserDetail.country_code,
-            };
-          }
-          return null;
-        })
-        .filter(Boolean)
-    ); // filter out null values
-    chunkCounter++;
-  }
-
-  // Perform batch upsert
-  if (newData.length > 0) {
-    const { error: upsertError } = await supabaseAdmin
-      .from("stocks")
-      .upsert(newData); // This replaces individual updates
-
-    if (upsertError) {
-      throw new Error("ERROR_BATCH_UPSERT: " + upsertError.message);
-    }
+  if (error) {
+    throw new Error(JSON.stringify(error));
   }
 }
 
-export async function refreshStock(stock_id: number) {
+export async function refreshStock({
+  stock_id,
+  log_history_if_new,
+}: {
+  stock_id: number;
+  log_history_if_new?: boolean;
+}) {
+  if (SETTINGS.SeasonClosed) {
+    return {};
+  }
   const osuUser = await osuClient.user.details(stock_id, "osu", "id");
+
+  console.log("Refreshing " + stock_id);
+
+  const { data: originalStockData, error: originalStockDataPullError } =
+    await supabaseAdmin
+      .from("stocks")
+      .select()
+      .eq("stock_id", stock_id)
+      .maybeSingle();
+
+  if (originalStockDataPullError) {
+    throw new Error(
+      "Error pulling originalStockData " + originalStockDataPullError.message
+    );
+  }
 
   if (!osuUser || osuUser.hasOwnProperty("error")) {
     // User might be banned. Set their info to be blank
-    try {
-      await supabaseAdmin.from("stocks").upsert({
+    if (originalStockData) {
+      const { error } = await supabaseAdmin.from("stocks").upsert({
         stock_id: stock_id,
         last_updated: new Date().toISOString(),
         share_price: null,
         osu_rank: null,
         osu_pp: null,
-        osu_rank_history: null,
-        monthly_playcount: null,
         is_buyable: false,
         is_sellable: false,
+        is_banned: true,
       });
-    } catch (e) {
-      console.error("UNCAUGHT ERROR:", e?.message || e);
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      return {
+        isBanned: true,
+      };
+    } else {
+      throw new Error("osu! user does not exist in database");
     }
-    throw new Error("osu! user does not exist");
   }
 
   const isBuyable = calculateIfStockCanBeBought(
-    osuUser.statistics.global_rank,
-    osuUser.statistics.pp,
+    osuUser.statistics?.global_rank,
+    osuUser.statistics?.pp,
     osuUser.rankHistory?.data,
     osuUser.monthly_playcounts,
     osuUser.join_date
@@ -589,47 +518,149 @@ export async function refreshStock(stock_id: number) {
     osuUser?.rankHistory?.data
   );
 
-  try {
-    const { data: upsertData, error: upsertError } = await supabaseAdmin
-      .from("stocks")
-      .upsert({
-        stock_id: stock_id,
-        last_updated: new Date().toISOString(),
-        share_price: stockPrice,
-        osu_name: osuUser?.username,
-        osu_picture: osuUser?.avatar_url,
-        osu_banner:
-          osuUser?.cover_url || osuUser?.cover.url || osuUser?.cover.custom_url,
-        osu_rank: osuUser?.statistics.global_rank,
-        osu_pp: osuUser?.statistics.pp,
-        osu_rank_history: osuUser?.rankHistory?.data
-          ? osuUser?.rankHistory.data
-          : [],
-        osu_playcount_history: osuUser?.monthly_playcounts,
-        osu_join_date: osuUser?.join_date,
-        is_buyable: isBuyable.canBeBought,
-        is_sellable: isSellable,
-        osu_country_code: osuUser?.country_code,
-      })
-      .select("prevent_trades");
+  const shouldCheckRebalance =
+    originalStockData?.share_price &&
+    (stockPrice > originalStockData.share_price
+      ? stockPrice >= 1.05 * originalStockData.share_price
+      : originalStockData.share_price >= 1.02 * stockPrice);
 
-    if (upsertError || upsertData.length !== 1) {
-      throw new Error(upsertError.message || "upsertData length is not 1");
+  let bestPlays = originalStockData?.osu_best_plays;
+  let didRebalanceOccur = false;
+  if (
+    SETTINGS.CheckPPRebalanceOnStocks &&
+    (shouldCheckRebalance || !bestPlays)
+  ) {
+    // Check if a rebalance occurred
+
+    const osuUserBestPlays = await osuClient.scores.user.category(
+      stock_id,
+      "best",
+      {
+        mode: "osu",
+        limit: "100",
+      }
+    );
+
+    const pulledBestPlays = osuUserBestPlays.map((play) => {
+      return {
+        id: play.id,
+        pp: play.pp as unknown as number,
+        date: play.created_at,
+      };
+    });
+
+    let rebalancedScoreDetails = [];
+    if (bestPlays && originalStockData?.share_price) {
+      let rebalanceResult = checkRebalance(bestPlays, pulledBestPlays);
+      didRebalanceOccur = rebalanceResult.didRebalance;
+      rebalancedScoreDetails = rebalanceResult.rebalancedScores;
     }
+
+    const { error } = await supabaseAdmin.from("best_plays_test").insert({
+      old_best_plays: bestPlays,
+      new_best_plays: pulledBestPlays,
+      stock_id: stock_id,
+      did_rebalance_occur: didRebalanceOccur,
+      rebalanced_scores: rebalancedScoreDetails,
+    });
+
+    if (!error) {
+      console.log("Successfully inserted rebalance plays for", stock_id);
+    }
+
+    bestPlays = pulledBestPlays;
+  }
+
+  // Inserted fields for refreshStock rpc function
+
+  const osu_user_data = {
+    last_updated: new Date().toISOString(),
+    share_price: stockPrice,
+    osu_name: osuUser?.username,
+    osu_picture: osuUser?.avatar_url,
+    osu_banner:
+      osuUser?.cover_url || osuUser?.cover?.url || osuUser?.cover?.custom_url,
+    osu_rank: osuUser?.statistics.global_rank,
+    osu_pp: osuUser?.statistics.pp,
+    osu_rank_history: osuUser?.rankHistory?.data
+      ? osuUser?.rankHistory.data
+      : [],
+    osu_playcount_history: osuUser?.monthly_playcounts ?? [],
+    osu_join_date: osuUser?.join_date,
+    is_buyable: isBuyable.canBeBought,
+    is_sellable: isSellable,
+    osu_country_code: osuUser?.country_code,
+    is_banned: false,
+    osu_best_plays: bestPlays ?? [],
+  };
+
+  try {
+    console.log("Performing rebalance", didRebalanceOccur);
+    const { error: refreshStockError } = await supabaseAdmin.rpc(
+      "refresh_stock",
+      {
+        p_stock_id: stock_id,
+        p_osu_user_data: osu_user_data,
+        p_do_dilute_shares: didRebalanceOccur,
+      }
+    );
+
+    if (refreshStockError) {
+      throw new Error(
+        refreshStockError.message || "upsertData length is not 1"
+      );
+    }
+
+    console.log("Calculated stock price for " + stock_id + " is " + stockPrice);
+
+    if (log_history_if_new && stockPrice) {
+      const prev_history = await supabaseAdmin
+        .from("stocks_history")
+        .select()
+        .eq("stock_id", stock_id)
+        .limit(1);
+
+      if (prev_history.error) {
+        throw new Error(
+          "Error pulling stocks history: " + prev_history.error.message
+        );
+      }
+
+      if (prev_history.data.length === 0) {
+        const insert_history = await supabaseAdmin
+          .from("stocks_history")
+          .insert({
+            stock_id: stock_id,
+            price: stockPrice,
+          });
+        if (insert_history.error) {
+          throw new Error(
+            "Error inserting into stocks history: " +
+              insert_history.error.message
+          );
+        }
+      }
+    }
+
+    const preventTrades =
+      originalStockData && originalStockData?.prevent_trades;
 
     return {
       osuUser: osuUser,
       stockPrice: stockPrice,
-      canBuyStock: isBuyable.canBeBought && !upsertData[0].prevent_trades,
-      canSellStock: isSellable && !upsertData[0].prevent_trades,
+      canBuyStock: isBuyable.canBeBought && !preventTrades,
+      canSellStock: isSellable && !preventTrades,
       buyableRequirements: isBuyable.buyableStatus,
     };
   } catch (e) {
+    console.log("Cannot refresh stock stats: " + e?.message);
     throw Error("Cannot refresh stock stats: " + e?.message);
   }
 }
 
 export async function millisecondsUntilTradingBonus(userId: number) {
+  // We're disabling trading bonus right now because they're creating postgres constraint violations atm
+  return 100
   const now = new Date();
   const currentUtcTime = Date.UTC(
     now.getUTCFullYear(),
@@ -672,7 +703,12 @@ export async function millisecondsUntilTradingBonus(userId: number) {
 export async function getTrendingStocks(
   showTimestamps = false
 ): Promise<StockStats[]> {
-  const response = await supabaseAdmin.rpc("get_top_stocks");
+  // const response = await supabaseAdmin.rpc("get_top_stocks");
+  const response = await supabaseAdmin
+    .from("trending_stocks")
+    .select()
+    .order("share_price_change_percentage", { ascending: false })
+    .limit(15);
   if (response.error) {
     console.error(JSON.stringify(response.error));
     throw new Error(response.error.message);

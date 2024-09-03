@@ -41,7 +41,7 @@ export default function InfoCardSmall({
       </h1>
       <ReactTooltip
         id={label}
-        className=" max-w-xs z-50 whitespace-pre-wrap break-words"
+        className=" max-w-xs z-10 whitespace-pre-wrap break-words"
         place="top"
         content={hoverInfo}
       />

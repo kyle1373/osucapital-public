@@ -1,11 +1,4 @@
 import { NextApiRequest, NextApiResponse } from "next";
-import { COOKIES } from "@constants/constants";
-import {
-  addFriendConnection,
-  getUserBySession,
-  removeFriendConnection,
-} from "@lib/server/user";
-import { withRateLimit } from "@lib/ratelimiter";
 import { getStockStats } from "@lib/server/stock";
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -16,11 +9,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 
   try {
-    const stock = await getStockStats(stock_id, null)
-    return res.json(stock)
+    const stock = await getStockStats(stock_id, null);
+    return res.json(stock);
   } catch (error) {
     return res.status(500).send({ error: error.message });
   }
 }
 
-export default withRateLimit(handler);
+export default handler;

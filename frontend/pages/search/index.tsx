@@ -7,6 +7,7 @@ import "chart.js/auto";
 import { showMessage } from "@lib/showMessage/showMessage";
 import { SearchResult } from "@lib/server/search";
 import SearchCard from "@components/SearchCard";
+import SEO from "@components/SEO";
 
 interface SearchProps {
   session: User;
@@ -27,13 +28,13 @@ export default function Search(props: SearchProps) {
     const savedResults = localStorage.getItem("searchResults");
     if (savedResults) {
       setSearchedData(JSON.parse(savedResults));
-      localStorage.removeItem("searchResults")
+      localStorage.removeItem("searchResults");
     }
-    
+
     const savedQuery = localStorage.getItem("savedQuery");
     if (savedQuery) {
       setSearchTerm(JSON.parse(savedQuery));
-      localStorage.removeItem("savedQuery")
+      localStorage.removeItem("savedQuery");
     }
   }, []);
 
@@ -61,9 +62,7 @@ export default function Search(props: SearchProps) {
     if (!searchTerm || loading) return;
     setLoading(true);
     try {
-      const searchResponse = await fetch(
-        `/api/search?query=${searchTerm}`
-      );
+      const searchResponse = await fetch(`/api/search?query=${searchTerm}`);
       const pulledSearchedData = await searchResponse.json();
       if (pulledSearchedData.error) {
         throw new Error(pulledSearchedData.error);
@@ -77,75 +76,81 @@ export default function Search(props: SearchProps) {
   };
 
   return (
-    <SidebarWrapper>
-      <main className="h-full w-full py-6 px-4">
-        <div className="flex justify-center items-center">
-          <form onSubmit={handleSearchSubmit} className="text-center">
-            <div className="flex flex-wrap justify-center gap-4 items-end">
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={handleSearchChange}
-                placeholder="Search..."
-                className="flex-auto rounded px-4 py-2 bg-neutral-500 placeholder:text-neutral-300 placeholder:font-medium text-white font-medium"
-              />
-              <button
-                type="submit"
-                className="px-4 py-2 text-white rounded bg-customPink-light hover:bg-customPink-dark font-medium transition duration-300"
-              >
-                Submit
-              </button>
-            </div>
-            <div className="mt-4">
-              <label className="text-white">
+    <>
+      <SEO title={`Search`} />
+      <SidebarWrapper>
+        <main className="h-full w-full py-6 px-4">
+          <div className="flex justify-center items-center">
+            <form onSubmit={handleSearchSubmit} className="text-center">
+              <div className="flex flex-wrap justify-center gap-4 items-end">
                 <input
-                  type="checkbox"
-                  checked={isStocksChecked}
-                  onChange={handleStocksChange}
-                  className="mr-2"
+                  type="text"
+                  value={searchTerm}
+                  onChange={handleSearchChange}
+                  placeholder="Search..."
+                  className="flex-auto rounded px-4 py-2 bg-neutral-500 placeholder:text-neutral-300 placeholder:font-medium text-white font-medium"
                 />
-                Stocks
-              </label>
-              <label className="ml-8 text-white">
-                <input
-                  type="checkbox"
-                  checked={isTradersChecked}
-                  onChange={handleTradersChange}
-                  className="mr-2"
-                />
-                Traders
-              </label>
-            </div>
-          </form>
-        </div>
-        <div className="flex justify-center items-center">
-          {loading && <ClipLoader color="#FFFFFF" size={30} className="mt-6" />}
-          <div className="flex justify-center mt-8">
-            {searchedData?.length === 0 && !loading && (
-              <h2 className="text-lg text-neutral-300">
-                No results.
-              </h2>
+                <button
+                  type="submit"
+                  className="px-4 py-2 text-white rounded bg-customPink-light hover:bg-customPink-dark font-medium transition duration-300"
+                >
+                  Submit
+                </button>
+              </div>
+              <div className="mt-4">
+                <label className="text-white">
+                  <input
+                    type="checkbox"
+                    checked={isStocksChecked}
+                    onChange={handleStocksChange}
+                    className="mr-2"
+                  />
+                  Stocks
+                </label>
+                <label className="ml-8 text-white">
+                  <input
+                    type="checkbox"
+                    checked={isTradersChecked}
+                    onChange={handleTradersChange}
+                    className="mr-2"
+                  />
+                  Traders
+                </label>
+              </div>
+            </form>
+          </div>
+          <div className="flex justify-center items-center">
+            {loading && (
+              <ClipLoader color="#FFFFFF" size={30} className="mt-6" />
             )}
-            <div className="grid grid-cols-1 md:grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-6 justify-center">
-              {!loading &&
-                searchedData?.map((searched) => {
-                  if((!isStocksChecked && (searched.type === "Stock")) || (!isTradersChecked && (searched.type === "Trader"))){
-                    return
-                  }
-                  return (
-                    <div key={searched.osu_id + searched.type}>
-                      <SearchCard
-                        searchInfo={searched}
-                        onNavigate={handleNavigation}
-                      />
-                    </div>
-                  );
-                })}
+            <div className="flex justify-center mt-8">
+              {searchedData?.length === 0 && !loading && (
+                <h2 className="text-lg text-neutral-300">No results.</h2>
+              )}
+              <div className="grid grid-cols-1 md:grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-6 justify-center">
+                {!loading &&
+                  searchedData?.map((searched) => {
+                    if (
+                      (!isStocksChecked && searched.type === "Stock") ||
+                      (!isTradersChecked && searched.type === "Trader")
+                    ) {
+                      return;
+                    }
+                    return (
+                      <div key={searched.osu_id + searched.type}>
+                        <SearchCard
+                          searchInfo={searched}
+                          onNavigate={handleNavigation}
+                        />
+                      </div>
+                    );
+                  })}
+              </div>
             </div>
           </div>
-        </div>
-      </main>
-    </SidebarWrapper>
+        </main>
+      </SidebarWrapper>
+    </>
   );
 }
 

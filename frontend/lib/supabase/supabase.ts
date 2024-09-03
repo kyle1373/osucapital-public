@@ -1,7 +1,6 @@
 /*
 
 IMPORTANT: Only import this into API routes. DO NOT IMPORT THIS ONTO ANY FRONTEND CODE.
-Use supabase.js for that, since it queries non-sensitive data.
 */
 
 import { createClient } from '@supabase/supabase-js';

@@ -5,7 +5,6 @@ import {
   getUserBySession,
   removeFriendConnection,
 } from "@lib/server/user";
-import { withRateLimit } from "@lib/ratelimiter";
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   const ALLOWED_ACTIONS = ["friend", "unfriend"];
@@ -43,4 +42,4 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 }
 
-export default withRateLimit(handler);
+export default handler;

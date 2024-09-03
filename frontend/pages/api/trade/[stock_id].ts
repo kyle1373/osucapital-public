@@ -8,7 +8,7 @@ import {
   refreshStock,
   sellShares,
 } from "@lib/server/stock";
-import { COOKIES, LIMIT } from "@constants/constants";
+import { COOKIES, LIMIT, SETTINGS } from "@constants/constants";
 import { getUserBySession } from "@lib/server/user";
 import supabaseAdmin from "@lib/supabase/supabase";
 import {
@@ -17,9 +17,11 @@ import {
   truncateToTwoDecimals,
 } from "@lib/utils";
 import osuClient from "@lib/osuClient";
-import { withRateLimit } from "@lib/ratelimiter";
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (SETTINGS.SeasonClosed) {
+    return res.status(401).send({ error: "Trading not allowed" });
+  }
   const allowedTradeTypes = ["buy", "sell"];
   const stockId = parseInt(req.query.stock_id as string);
   const seenSharePrice = parseFloat(req.body.seen_share_price);
@@ -73,15 +75,19 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   let pulledSharePrice = pulledStock.data.share_price as number;
   // if last_updated from db more than LIMIT.tradeStockMinutes
   if (
-    isAfterMinutes(pulledStock.data.last_updated, LIMIT.UpdateStockTradeMinutes) && !pulledStock.data.prevent_trades
+    isAfterMinutes(
+      pulledStock.data.last_updated,
+      LIMIT.UpdateStockTradeMinutes
+    ) &&
+    !pulledStock.data.prevent_trades
   ) {
     // pull from osuClient and update db
     try {
       const { osuUser, stockPrice, canBuyStock, canSellStock } =
-        await refreshStock(stockId);
+        await refreshStock({ stock_id: stockId });
       pulledSharePrice = stockPrice;
-      canBeBought = canBuyStock;
-      canBeSold = canSellStock;
+      canBeBought = canBuyStock && !pulledStock.data.prevent_trades;
+      canBeSold = canSellStock && !pulledStock.data.prevent_trades;
     } catch (e) {
       return res.status(500).send({
         error: "Error code TRADE2: " + e?.message,
@@ -121,4 +127,4 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     .send({ data: "Successfully traded " + numShares + " shares!" });
 }
 
-export default withRateLimit(handler);
+export default handler;

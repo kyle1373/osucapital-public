@@ -10,7 +10,7 @@ import {
   FaSeedling,
   FaBook,
 } from "react-icons/fa";
-import { IoIosArrowDown, IoIosArrowUp } from "react-icons/io";
+import { IoIosArrowDown, IoIosArrowUp, IoMdMegaphone } from "react-icons/io";
 
 import { useState, useEffect, useRef } from "react";
 import { useCurrentUser } from "hooks/UserContext";
@@ -50,10 +50,17 @@ const SidebarWrapper = ({ children }) => {
         disabled={undefined}
       />
       <LinkItem
+        icon={<IoMdMegaphone color={"#FFFFFF"} size={22} />}
+        text="Realtime"
+        href="/realtime"
+        newTab={undefined}
+        disabled={undefined}
+      />
+      <LinkItem
         icon={<FaUser color={"#FFFFFF"} />}
         text="Profile"
-        href={"/user/" + currentUser?.user_id}
-        disabled={!currentUser?.user_id}
+        href={currentUser ? "/user/" + currentUser?.user_id : "/dashboard"}
+        disabled={undefined}
         newTab={undefined}
       />
       <LinkItem

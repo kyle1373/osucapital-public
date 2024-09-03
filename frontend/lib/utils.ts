@@ -2,6 +2,7 @@ import { COINS } from "@constants/constants";
 import { type ClassValue, clsx } from "clsx";
 import { truncate } from "fs";
 import { twMerge } from "tailwind-merge";
+import confetti from "canvas-confetti";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -122,6 +123,8 @@ export function calculateSellProfitAndTax(
 
 // NOTE: This function is also used on the database. If you want to modify this function, also modify calculate_tax_on_profit on the db
 function calculateTaxOnProfit(profit: number, daysHeld: number): number {
+  return 0;
+
   const adjustedDaysHeld = Math.max(0, daysHeld) + 1;
   const taxRate =
     0.1 *
@@ -142,7 +145,6 @@ export function getBadgeImageServer(badge_id: string) {
 export function maxLimitCoins(coins: number) {
   return Math.min(COINS.MaxCoins, coins);
 }
-
 
 interface StockBuyableStatus {
   IsNotBannedRequirement: {
@@ -193,7 +195,7 @@ export const calculateIfStockCanBeBought = (
 } => {
   const returnVal: StockBuyableStatus = {
     RankRequirement: {
-      Reason: "be above rank 200,000",
+      Reason: "be above rank 100,000",
       Met: false,
     },
     RecentPlaycountRequirement: {
@@ -205,7 +207,7 @@ export const calculateIfStockCanBeBought = (
       Met: false,
     },
     PPRequirement: {
-      Reason: "have above 3,000pp",
+      Reason: "have above 4,000pp",
       Met: false,
     },
     RecentUnbanRequirement: {
@@ -231,13 +233,13 @@ export const calculateIfStockCanBeBought = (
     reasonsNotMet.push(returnVal.IsNotBannedRequirement.Reason);
   }
 
-  if (globalRank && globalRank < 200000) {
+  if (globalRank && globalRank <= 100000) {
     returnVal.RankRequirement.Met = true;
   } else {
     reasonsNotMet.push(returnVal.RankRequirement.Reason);
   }
 
-  if (globalPP && globalPP > 3000) {
+  if (globalPP && globalPP >= 4000) {
     returnVal.PPRequirement.Met = true;
   } else {
     reasonsNotMet.push(returnVal.PPRequirement.Reason);
@@ -314,6 +316,105 @@ export const calculateIfStockCanBeBought = (
   };
 };
 
-export const calculateIfStockCanBeSold = (buyableResponse: StockBuyableStatus): boolean => {
+export const calculateIfStockCanBeSold = (
+  buyableResponse: StockBuyableStatus
+): boolean => {
   return buyableResponse.IsNotBannedRequirement.Met;
 };
+
+export const shootFireworks = () => {
+  const duration = 5 * 1000;
+  const animationEnd = Date.now() + duration;
+  const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 0 };
+
+  function randomInRange(min, max) {
+    return Math.random() * (max - min) + min;
+  }
+
+  const interval = setInterval(function () {
+    const timeLeft = animationEnd - Date.now();
+
+    if (timeLeft <= 0) {
+      return clearInterval(interval);
+    }
+
+    const particleCount = 50 * (timeLeft / duration);
+    // since particles fall down, start a bit higher than random
+    confetti(
+      Object.assign({}, defaults, {
+        particleCount,
+        origin: { x: randomInRange(0.2, 0.4), y: Math.random() - 0.2 },
+      })
+    );
+    confetti(
+      Object.assign({}, defaults, {
+        particleCount,
+        origin: { x: randomInRange(0.6, 0.8), y: Math.random() - 0.2 },
+      })
+    );
+  }, 250);
+};
+
+export const formatCurrency = (amount = 0, currency = "USD") =>
+  new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency,
+    minimumIntegerDigits: 2,
+  }).format(amount / 100);
+
+export const didUserJustSubscribe = (query) => {
+  const doesStripeSessionExist = !!query?.stripe_session_id;
+
+  return doesStripeSessionExist;
+};
+
+export const getCleanErrorMessage = (error: Error) => {
+  var caller_line = error.stack?.split("\n")[4];
+  var index = caller_line.indexOf("at ");
+  var clean = caller_line.slice(index + 2, caller_line.length);
+  return clean;
+};
+
+/*
+checkRebalance
+
+This function checks if a rebalance ocurred. True if it did. False if it did not
+*/
+export function checkRebalance(
+  oldPlays: { id: number; pp: number; date: string }[],
+  newPlays: { id: number; pp: number; date: string }[]
+): {didRebalance: boolean, rebalancedScores: {
+  id: number;
+  oldPP: number;
+  newPP: number;
+  date: string;
+}[]} {
+  const oldPlayMap = new Map(oldPlays.map(play => [play.id, play]));
+  let rebalancedScores = 0;
+  const rebalancedScoreDetails: { id: number; oldPP: number; newPP: number; date: string }[] = [];
+
+  for (const newPlay of newPlays) {
+    const oldPlay = oldPlayMap.get(newPlay.id);
+    if (oldPlay !== undefined && oldPlay.pp !== newPlay.pp) {
+      rebalancedScores++;
+      rebalancedScoreDetails.push({
+        id: newPlay.id,
+        oldPP: oldPlay.pp,
+        newPP: newPlay.pp,
+        date: newPlay.date
+      });
+      if (rebalancedScores > 2) {
+        console.log("Rebalanced scores:", rebalancedScoreDetails);
+        return {didRebalance: true, rebalancedScores: rebalancedScoreDetails};
+      }
+    }
+  }
+
+  if (rebalancedScores > 0) {
+    console.log("Rebalanced scores:", rebalancedScoreDetails);
+  } else {
+    console.log("No rebalanced scores detected.");
+  }
+
+  return {didRebalance: false, rebalancedScores: rebalancedScoreDetails};
+}

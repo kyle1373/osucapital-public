@@ -1,6 +1,16 @@
+import SubscribeModal from "@components/SubscribeModal";
 import styled from "@emotion/styled";
-import React, { createContext, useContext, useState, ReactNode } from "react";
+import React, {
+  createContext,
+  useContext,
+  useState,
+  ReactNode,
+  useEffect,
+} from "react";
 import { ClipLoader } from "react-spinners";
+import { AnimatePresence } from "framer-motion";
+import JustSubscribedModal from "@components/JustSubscribedModal";
+import { useRouter } from "next/router";
 
 export interface User {
   user_id: number;
@@ -12,6 +22,9 @@ interface UserContextProps {
   currentUser: User;
   showLoading: React.Dispatch<React.SetStateAction<boolean>>;
   setCurrentUser: React.Dispatch<React.SetStateAction<User>>;
+  openSubscribeModal: () => void;
+  openJustSubscribedModal: () => void;
+  closeSubscribeModal: () => void;
 }
 
 const UserContext = createContext<UserContextProps | undefined>(undefined);
@@ -38,14 +51,48 @@ const LoadingOverlay = styled.div`
 export const UserProvider = ({ children }: UserProviderProps) => {
   const [currentUser, setCurrentUser] = useState<User>();
   const [loading, showLoading] = useState<boolean>(false);
+  const [subscribeModal, showSubscribeModal] = useState<boolean>(false);
+  const [justSubscribedModal, showJustSubscribedModal] =
+    useState<boolean>(false);
+
+  const openSubscribeModal = () => showSubscribeModal(true);
+  const closeSubscribeModal = () => showSubscribeModal(false);
+
+  const openJustSubscribedModal = () => showJustSubscribedModal(true);
+  const closeJustSubscribedModal = () => showJustSubscribedModal(false);
+
+  const { query } = useRouter();
+
+  useEffect(() => {
+    if (query.stripe_session_id) {
+      openJustSubscribedModal();
+    }
+  }, [query.stripe_session_id]);
 
   return (
-    <UserContext.Provider value={{ currentUser, showLoading, setCurrentUser }}>
+    <UserContext.Provider
+      value={{
+        currentUser,
+        showLoading,
+        setCurrentUser,
+        openSubscribeModal,
+        openJustSubscribedModal,
+        closeSubscribeModal,
+      }}
+    >
       {loading && (
         <LoadingOverlay>
           <ClipLoader color="#FFFFFF" size={100} />
         </LoadingOverlay>
       )}
+      <AnimatePresence initial={false} mode="wait" onExitComplete={() => null}>
+        {subscribeModal && <SubscribeModal handleClose={closeSubscribeModal} />}
+      </AnimatePresence>
+      <AnimatePresence initial={false} mode="wait" onExitComplete={() => null}>
+        {justSubscribedModal && (
+          <JustSubscribedModal handleClose={closeJustSubscribedModal} />
+        )}
+      </AnimatePresence>
       {children}
     </UserContext.Provider>
   );

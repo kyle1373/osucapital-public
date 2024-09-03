@@ -13,6 +13,7 @@ import { ClipLoader } from "react-spinners";
 import { showMessage } from "@lib/showMessage/showMessage";
 import { TEXT } from "@constants/constants";
 import Link from "next/link";
+import SEO from "@components/SEO";
 
 interface LeaderboardProps {
   session: User;
@@ -72,39 +73,44 @@ export default function Leaderboard(props: LeaderboardProps) {
   };
 
   return (
-    <SidebarWrapper>
-      <main className="h-full w-full overflow-y-auto px-4 py-8">
-        <h3 className="text-2xl font-semibold leading-tight text-white text-center">
-          Current Leaderboards
-        </h3>
-        <p className="text-md text-gray-300 font-semibold text-center">
-          {TEXT.CurrentSeason}
-        </p>
+    <>
+      <SEO title={"Leaderboards"} />
+      <SidebarWrapper>
+        <main className="h-full w-full overflow-y-auto px-4 py-8">
+          <h3 className="text-2xl font-semibold leading-tight text-white text-center">
+            Current Leaderboards
+          </h3>
+          <p className="text-md text-gray-300 font-semibold text-center">
+            {TEXT.CurrentSeason}
+          </p>
 
-        <div className="md:text-base flex justify-between text-xs mt-4 sm:mx-4 items-center text-center">
-          <Link
-            href="/leaderboard/season"
-            className="md:rounded-lg rounded font-semibold text-white bg-blue-800 duration-300 transition hover:bg-blue-900 px-5 py-2"
-          >
-            Previous seasons
-          </Link>
-          <label className="text-gray-300">
-            <input
-              type="checkbox"
-              checked={showFriendRankings}
-              onChange={toggleFriendRankings}
-              className="mr-2"
-            />
-            Show Friends
-          </label>
-        </div>
-        <div className="flex w-full justify-center">
-          {loading && <ClipLoader color="#FFFFFF" size={30} className="mt-6" />}
-        </div>
+          <div className="md:text-base flex justify-between text-xs mt-4 sm:mx-4 items-center text-center">
+            <Link
+              href="/leaderboard/season"
+              className="md:rounded-lg rounded font-semibold text-white bg-blue-800 duration-300 transition hover:bg-blue-900 px-5 py-2"
+            >
+              Previous seasons
+            </Link>
+            <label className="text-gray-300">
+              <input
+                type="checkbox"
+                checked={showFriendRankings}
+                onChange={toggleFriendRankings}
+                className="mr-2"
+              />
+              Show Friends
+            </label>
+          </div>
+          <div className="flex w-full justify-center">
+            {loading && (
+              <ClipLoader color="#FFFFFF" size={30} className="mt-6" />
+            )}
+          </div>
 
-        {!loading && <LeaderboardTable users={leaderboardUsers} />}
-      </main>
-    </SidebarWrapper>
+          {!loading && <LeaderboardTable users={leaderboardUsers} />}
+        </main>
+      </SidebarWrapper>
+    </>
   );
 }
 

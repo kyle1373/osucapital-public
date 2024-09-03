@@ -145,7 +145,7 @@ export default function ModalPopup(props: ModalPopupProps) {
     <div
       id="modal-overlay"
       onClick={(e) => handleOverlayClick(e)}
-      className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-40"
+      className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-10"
     >
       <div className="relative bg-white rounded-lg w-full max-w-xs mx-4 p-6">
         <button
@@ -221,8 +221,7 @@ export default function ModalPopup(props: ModalPopupProps) {
                     ).toFixed(2)}{" "}
                     coins
                   </span>{" "}
-                  (profit of {calculateProfitAndTax().profit.toFixed(2)} after a{" "}
-                  {getTaxPercent().toFixed(2)}% tax)
+                  (profit of {calculateProfitAndTax().profit.toFixed(2)})
                 </p>
               )}
 

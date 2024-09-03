@@ -4,12 +4,22 @@ import { User } from "@hooks/UserContext";
 import { getUserBySession } from "./server/user";
 
 export interface sessionProps {
-    session: User;
+  session: User;
 }
 
-export async function mustBeLoggedInServer(context: GetServerSidePropsContext): Promise<{ props: sessionProps } | {redirect}> {
-  const userSession = context.req.cookies[COOKIES.userSession];
-  const pulledUser = await getUserBySession(userSession)
+export async function getUserByContext(
+  context: GetServerSidePropsContext
+): Promise<User> {
+  const pulledUser = await getUserBySession(
+    context.req.cookies[COOKIES.userSession]
+  );
+  return pulledUser;
+}
+
+export async function mustBeLoggedInServer(
+  context: GetServerSidePropsContext
+): Promise<{ props: sessionProps } | { redirect }> {
+  const pulledUser = await getUserByContext(context);
 
   if (!pulledUser) {
     console.log("pulledUser is undefined");
@@ -17,9 +27,10 @@ export async function mustBeLoggedInServer(context: GetServerSidePropsContext): 
       "Set-Cookie",
       "userSession=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"
     );
+    const returnUrl = encodeURIComponent(context.resolvedUrl);
     return {
       redirect: {
-        destination: "/",
+        destination: `/api/auth/osu?return=${returnUrl}`,
         permanent: false,
       },
     };

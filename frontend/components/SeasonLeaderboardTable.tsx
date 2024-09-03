@@ -1,13 +1,10 @@
 import Link from "next/link";
-import {
-  LeaderboardUser,
-  SeasonLeaderboardUser,
-} from "@lib/server/leaderboard";
+import { LeaderboardUser } from "@lib/server/leaderboard";
 import { useCurrentUser } from "@hooks/UserContext";
 import { numberWithCommas } from "@lib/utils";
 
 interface ActivityTableProps {
-  users: SeasonLeaderboardUser[];
+  users: LeaderboardUser[];
 }
 
 export default function SeasonLeaderboardTable(props: ActivityTableProps) {
@@ -51,7 +48,7 @@ export default function SeasonLeaderboardTable(props: ActivityTableProps) {
                   return (
                     <tr className={`${getColor()}`} key={index}>
                       <td
-                        className={`sm:px-6 py-3 px-3 whitespace-nowrap sm:text-lg truncate text-xs font-semibold ${
+                        className={`sm:px-6 py-3 px-3 whitespace-nowrap sm:text-lg truncate text-xs font-semibold text-white ${
                           currentUser?.user_id === user.user_id
                             ? "text-yellow-300"
                             : "text-gray-50"
@@ -66,7 +63,21 @@ export default function SeasonLeaderboardTable(props: ActivityTableProps) {
                             src={user.osu_picture}
                             className="h-8 rounded mx-4"
                           />
-                          {user.osu_name}
+                          <span
+                            style={
+                              {
+                                "--glow-from-color": user.is_supporter
+                                  ? user.color_flare
+                                  : undefined,
+                                "--glow-to-color": user.is_supporter
+                                  ? user.color_flare
+                                  : undefined,
+                              } as any
+                            }
+                            className={user.is_supporter ? "glow" : ""}
+                          >
+                            {user.osu_name}
+                          </span>
                         </Link>
                       </td>
                       <td className="sm:px-6 py-3 px-3 whitespace-nowrap sm:text-lg text-xs font-semibold text-gray-300">

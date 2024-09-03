@@ -6,6 +6,9 @@ export interface LeaderboardUser {
   osu_picture: string;
   total_coins: number;
   coin_differential: number;
+  is_supporter: boolean;
+  color_flare: string;
+  osu_country_code: string;
 }
 
 export const getLatestLeaderboardUsers = async (): Promise<
@@ -26,6 +29,9 @@ export const getLatestLeaderboardUsers = async (): Promise<
       osu_picture: item.osu_picture,
       total_coins: item.total_coins,
       coin_differential: item.coin_differential,
+      is_supporter: item.is_supporter,
+      color_flare: item.color_flare,
+      osu_country_code: item.osu_country_code,
     }));
   } catch (error) {
     console.error("Error fetching leaderboard data:", error?.message);
@@ -52,6 +58,9 @@ export const getLatestFriendLeaderboardUsers = async (
       osu_picture: item.osu_picture,
       total_coins: item.total_coins,
       coin_differential: item.coin_differential,
+      is_supporter: item.is_supporter,
+      color_flare: item.color_flare,
+      osu_country_code: item.osu_country_code,
     }));
   } catch (error) {
     console.error("Error fetching friend leaderboard data:", error?.message);
@@ -61,11 +70,16 @@ export const getLatestFriendLeaderboardUsers = async (
 
 export const getTopTradersToday = async (): Promise<LeaderboardUser[]> => {
   try {
-    let { data, error } = await supabaseAdmin.rpc("get_top_traders_today");
+    const { data, error } = await supabaseAdmin
+      .from("top_traders")
+      .select()
+      .order("coin_differential", { ascending: false })
+      .limit(15);
 
     if (error) {
       throw new Error(error.message);
     }
+    console.log(JSON.stringify(data));
 
     return data.map((item) => ({
       user_id: item.user_id,
@@ -73,6 +87,9 @@ export const getTopTradersToday = async (): Promise<LeaderboardUser[]> => {
       osu_picture: item.osu_picture,
       total_coins: item.total_coins,
       coin_differential: item.coin_differential,
+      is_supporter: item.is_supporter,
+      color_flare: item.color_flare,
+      osu_country_code: item.osu_country_code,
     }));
   } catch (error) {
     console.error("Error fetching friend leaderboard data:", error?.message);
@@ -158,17 +175,9 @@ export const getAllSeasons = async (): Promise<Season[]> => {
   }
 };
 
-export interface SeasonLeaderboardUser {
-  rank: number;
-  user_id: number;
-  osu_name: string;
-  osu_picture: string;
-  total_coins: number;
-}
-
 export const getSeasonLeaderboards = async (
   seasonId: number
-): Promise<SeasonLeaderboardUser[]> => {
+): Promise<LeaderboardUser[]> => {
   try {
     let { data, error } = await supabaseAdmin.rpc("get_top_players_by_season", {
       p_season_id: seasonId,
@@ -178,7 +187,16 @@ export const getSeasonLeaderboards = async (
       throw error;
     }
 
-    return data;
+    return data.map((item) => ({
+      user_id: item.user_id,
+      osu_name: item.osu_name,
+      osu_picture: item.osu_picture,
+      total_coins: item.total_coins,
+      coin_differential: item.coin_differential,
+      is_supporter: item.is_supporter,
+      color_flare: item.color_flare,
+      osu_country_code: item.osu_country_code,
+    }));
   } catch (error) {
     console.error("Error fetching season leaderboards:", error?.message);
     return [];

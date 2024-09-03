@@ -7,7 +7,6 @@ import { GetServerSidePropsContext } from "next";
 import {
   LeaderboardUser,
   Season,
-  SeasonLeaderboardUser,
   getAllSeasons,
   getLatestLeaderboardUsers,
   getSeason,
@@ -20,11 +19,12 @@ import { TEXT } from "@constants/constants";
 import Link from "next/link";
 import { strictParseInt } from "@lib/utils";
 import SeasonLeaderboardTable from "@components/SeasonLeaderboardTable";
+import SEO from "@components/SEO";
 
 interface SeasonsProps {
   session: User;
   season: Season;
-  seasonUsers: SeasonLeaderboardUser[];
+  seasonUsers: LeaderboardUser[];
 }
 
 export default function Leaderboard(props: SeasonsProps) {
@@ -102,18 +102,21 @@ export default function Leaderboard(props: SeasonsProps) {
   }
 
   return (
-    <SidebarWrapper>
-      <main className="h-full w-full overflow-y-auto px-4 py-8">
-        <h3 className="text-2xl font-semibold leading-tight text-white text-center">
-          {props.season.season_name + " Leaderboards"}
-        </h3>
-        <p className="text-md text-gray-300 font-semibold text-center mb-4">
-          {formatDateRange(props.season.start_date, props.season.end_date)}
-        </p>
+    <>
+      <SEO title={`${props.season.season_name} - Leaderboards`} />
+      <SidebarWrapper>
+        <main className="h-full w-full overflow-y-auto px-4 py-8">
+          <h3 className="text-2xl font-semibold leading-tight text-white text-center">
+            {props.season.season_name + " Leaderboards"}
+          </h3>
+          <p className="text-md text-gray-300 font-semibold text-center mb-4">
+            {formatDateRange(props.season.start_date, props.season.end_date)}
+          </p>
 
-        <SeasonLeaderboardTable users={props.seasonUsers} />
-      </main>
-    </SidebarWrapper>
+          <SeasonLeaderboardTable users={props.seasonUsers} />
+        </main>
+      </SidebarWrapper>
+    </>
   );
 }
 

@@ -14,7 +14,7 @@ export default function Home() {
   };
 
   return (
-    <main className={styles.backgroundtriangle}>
+    <main className={styles.backgroundtrianglewithformatting}>
       <h1 className="text-9xl font-semibold mb-8 text-white">404</h1>
       <h2 className="text-lg md:text-xl lg:text-2xl font-medium text-gray-300">
         {"¯\\_(ツ)_/¯"}

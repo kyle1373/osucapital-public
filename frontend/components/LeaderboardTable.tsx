@@ -54,10 +54,10 @@ export default function LeaderboardTable(props: ActivityTableProps) {
                   return (
                     <tr className={`${getColor()}`} key={index}>
                       <td
-                        className={`sm:px-6 py-3 px-3 whitespace-nowrap sm:text-lg truncate text-xs font-semibold ${
+                        className={`sm:px-6 py-3 px-3 whitespace-nowrap sm:text-lg truncate text-xs text-white ${
                           currentUser?.user_id === user.user_id
-                            ? "text-yellow-300"
-                            : "text-gray-50"
+                            ? "font-black"
+                            : "font-semibold"
                         }`}
                       >
                         <Link
@@ -69,7 +69,19 @@ export default function LeaderboardTable(props: ActivityTableProps) {
                             src={user.osu_picture}
                             className="h-8 rounded mx-4"
                           />
-                          {user.osu_name}
+                          <span
+                            style={{
+                              "--glow-from-color": user.is_supporter
+                                ? user.color_flare
+                                : undefined,
+                              "--glow-to-color": user.is_supporter
+                                ? user.color_flare
+                                : undefined,
+                            } as any}
+                            className={user.is_supporter ? "glow" : ""}
+                          >
+                            {user.osu_name}
+                          </span>
                         </Link>
                       </td>
                       <td className="sm:px-6 py-3 px-3 whitespace-nowrap sm:text-lg text-xs font-semibold text-gray-300">

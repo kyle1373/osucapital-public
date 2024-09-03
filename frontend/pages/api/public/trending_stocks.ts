@@ -2,14 +2,8 @@
 
 import { NextApiRequest, NextApiResponse } from "next";
 import { getTrendingStocks, getUserStocks } from "@lib/server/stock";
-import { COOKIES } from "@constants/constants";
-import { getUserBySession } from "@lib/server/user";
-import { withRateLimit } from "@lib/ratelimiter";
 
-async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse
-) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     const stocks = await getTrendingStocks(true);
     return res.status(200).json(stocks);
@@ -18,4 +12,4 @@ async function handler(
   }
 }
 
-export default withRateLimit(handler)
+export default handler;

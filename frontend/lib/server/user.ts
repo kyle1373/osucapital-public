@@ -27,7 +27,24 @@ export interface UserStats {
   friend_rank: number;
   show_trades: boolean;
   liable_taxes: number;
+  is_supporter: boolean;
+  color_flare: string;
+  osu_country_code: string;
 }
+
+export const checkIfStockExists = async (userId: number): Promise<boolean> => {
+  const { data, error } = await supabaseAdmin
+    .from("stocks")
+    .select("stock_id")
+    .eq("stock_id", userId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data.length > 0;
+};
+
 export const getUserStats = async (user_id: number): Promise<UserStats> => {
   const { data, error } = await supabaseAdmin
     .rpc("get_user_details", { user_req: user_id })
@@ -77,18 +94,18 @@ export const getUserStats = async (user_id: number): Promise<UserStats> => {
 
 export const getUserBySession = async (userSession: string): Promise<User> => {
   if (!userSession) {
-    return undefined;
+    return null;
   }
   const pulledUser: User | null = await kvReadOnly.get(userSession);
 
   if (!pulledUser) {
-    return undefined;
+    return null;
   }
   const keys = Object.keys(pulledUser);
   for (const key of keys) {
     if (pulledUser[key] === null || pulledUser[key] === undefined) {
       await kvReadWrite.del(userSession);
-      return undefined;
+      return null;
     }
   }
 
@@ -107,7 +124,8 @@ export interface UserTradeInfo {
 }
 
 export const getUserTradeHistory = async (
-  userId: number
+  userId: number,
+  limit: number
 ): Promise<UserTradeInfo[]> => {
   const tradeHistory = await supabaseAdmin
     .from("trades")
@@ -115,7 +133,7 @@ export const getUserTradeHistory = async (
       "stock_id, stocks(osu_name), type, num_shares, timestamp, coins, profit, coins_with_taxes"
     )
     .order("timestamp", { ascending: false }) // Sort by timestamp in descending order
-    .limit(20)
+    .limit(limit)
     .eq("user_id", userId);
 
   if (tradeHistory.error) {
@@ -195,6 +213,7 @@ export const getUserHeldCoins = async (user_id: number): Promise<number> => {
 
 export interface Settings {
   show_trades?: boolean;
+  color_flare?: string;
 }
 export const updateSettings = async (
   user_id: number,
@@ -210,10 +229,22 @@ export const updateSettings = async (
   }
 };
 
-export const getSettings = async (user_id: string): Promise<Settings> => {
+export const getSettingsAndSubscriptionStatus = async (
+  user_id: string
+): Promise<{
+  settings: Settings;
+  username: string;
+  joined_datetime: string;
+  country_code: string;
+  picture: string;
+  isSubscribed: boolean;
+  stripeCustomerId: string;
+}> => {
   const { data, error } = await supabaseAdmin
     .from("users")
-    .select("show_trades")
+    .select(
+      "osu_picture, osu_name, show_trades, color_flare, stripe_subscription_status, stripe_customer_id, joined, osu_country_code"
+    )
     .eq("user_id", user_id)
     .single();
 
@@ -221,7 +252,18 @@ export const getSettings = async (user_id: string): Promise<Settings> => {
     throw new Error(error.message);
   }
 
-  return data;
+  return {
+    username: data.osu_name,
+    joined_datetime: data.joined,
+    country_code: data.osu_country_code,
+    picture: data.osu_picture,
+    settings: {
+      show_trades: data.show_trades,
+      color_flare: data.color_flare,
+    },
+    isSubscribed: data.stripe_subscription_status === "active",
+    stripeCustomerId: data.stripe_customer_id,
+  };
 };
 
 // This function is used to get the badge image via the server itself and not the client. On the client if we did .env variables they would be undefined on first load. We gotta do this on the server.
@@ -244,4 +286,17 @@ export const getUserBadges = (userStats: UserStats): UserBadges[] => {
     return [];
   }
   return userBadges;
+};
+
+export const getNumUsers = async () => {
+  const { data, error, count } = await supabaseAdmin
+    .from("users")
+    .select("*", { count: "exact" });
+
+  if (error) {
+    console.log("ERROR GETTING NUMBER OF USERS: " + error.message);
+    return null;
+  }
+
+  return count;
 };

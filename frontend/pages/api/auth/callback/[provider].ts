@@ -12,18 +12,23 @@ const handler = (_req: NextApiRequest, _res: NextApiResponse) => {
     return _res.status(404).send("Provider not allowed");
   }
 
+  const cancelUrl = "/";
+  const returnUrl = (_req?.query?.state as string) ?? "/dashboard";
+
   passport.authenticate(
     provider,
     {
-      failureRedirect: "/",
-      successRedirect: "/dashboard",
+      failureRedirect: cancelUrl,
+      successRedirect: returnUrl,
     },
     async (...args: any[]) => {
       try {
         // Extract the second item from the array which contains the data
         const userData = args[1];
 
-        console.log(JSON.stringify(userData._json));
+        if (!userData) {
+          return _res.redirect(cancelUrl);
+        }
 
         // Extracting the required fields
         const user_id = userData._json.id;
@@ -31,8 +36,9 @@ const handler = (_req: NextApiRequest, _res: NextApiResponse) => {
         const osu_picture = userData._json.avatar_url;
         const osu_banner =
           userData._json.cover_url ||
-          userData._json.cover.custom_url ||
-          userData._json.cover.url;
+          userData._json.cover?.custom_url ||
+          userData._json.cover?.url;
+        const osu_country_code = userData._json.country_code;
 
         // // fast whitelist implementation
         // const resp = await supabaseAdmin
@@ -45,13 +51,16 @@ const handler = (_req: NextApiRequest, _res: NextApiResponse) => {
         //   return _res.redirect("/");
         // }
 
-        // if (new Date().getTime() <= new Date(LIMIT.SeasonOpenDate).getTime()) {
+        // if (
+        //   user_id !== 11461481 &&
+        //   new Date().getTime() <= new Date(LIMIT.SeasonOpenDate).getTime()
+        // ) {
         //   return _res.redirect("/");
         // }
 
         const osuCapitalUser = await supabaseAdmin
           .from("users")
-          .select("osu_name, osu_picture, osu_banner")
+          .select("osu_name, osu_picture, osu_banner, osu_country_code")
           .eq("user_id", user_id);
 
         if (osuCapitalUser.error) {
@@ -60,21 +69,34 @@ const handler = (_req: NextApiRequest, _res: NextApiResponse) => {
 
         if (osuCapitalUser.data.length === 0) {
           // We have a new user!
-          await supabaseAdmin.from("users").insert([
+          const resp1 = await supabaseAdmin.from("users").insert([
             {
               user_id: user_id,
               osu_name: osu_name,
               osu_picture: osu_picture,
               osu_banner: osu_banner,
               coins_held: COINS.StartingCoins,
+              osu_country_code: osu_country_code,
             },
           ]);
 
-          await supabaseAdmin.from("users_history").insert({
+          if (resp1.error) {
+            throw new Error(
+              "Fatal error inserting user:" + resp1.error.message
+            );
+          }
+
+          const resp2 = await supabaseAdmin.from("users_history").insert({
             user_id: user_id,
             total_coins: COINS.StartingCoins,
             net_worth: COINS.StartingCoins,
           });
+
+          if (resp2.error) {
+            console.log(
+              "UNCAUGHT ERROR (still continuing):" + resp2.error.message
+            );
+          }
         } else {
           const { data, error } = await supabaseAdmin
             .from("users_history")
@@ -96,7 +118,8 @@ const handler = (_req: NextApiRequest, _res: NextApiResponse) => {
           if (
             osuCapitalUser.data[0].osu_name !== osu_name ||
             osuCapitalUser.data[0].osu_picture !== osu_picture ||
-            osuCapitalUser.data[0].osu_banner !== osu_banner
+            osuCapitalUser.data[0].osu_banner !== osu_banner ||
+            osuCapitalUser.data[0].osu_country_code !== osu_country_code
           ) {
             await supabaseAdmin
               .from("users")
@@ -104,11 +127,18 @@ const handler = (_req: NextApiRequest, _res: NextApiResponse) => {
                 osu_name: osu_name,
                 osu_picture: osu_picture,
                 osu_banner: osu_banner,
+                osu_country_code: osu_country_code,
               })
               .eq("user_id", user_id);
           }
         }
         const sessionToken = await generateSecureSessionString();
+
+        const oldUserSession = _req.cookies[COOKIES.userSession];
+
+        if (oldUserSession) {
+          await kvReadWrite.del(oldUserSession);
+        }
 
         await kvReadWrite.set(sessionToken, {
           user_id: user_id,
@@ -125,7 +155,10 @@ const handler = (_req: NextApiRequest, _res: NextApiResponse) => {
             path: "/",
           })
         );
-        return _res.redirect("/dashboard");
+
+        return _res.redirect(
+          (returnUrl as string) ? (returnUrl as string) : "/dashboard"
+        );
       } catch (e) {
         _res.setHeader(
           "Set-Cookie",

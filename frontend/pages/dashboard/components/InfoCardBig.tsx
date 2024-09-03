@@ -44,7 +44,7 @@ export default function InfoCardBig(props: InfoCardProps) {
       )}
       <ReactTooltip
         id={props.label}
-        className=" max-w-xs z-50 whitespace-pre-wrap break-words"
+        className=" max-w-xs z-10 whitespace-pre-wrap break-words"
         place="top"
         content={props.hoverInfo}
       />

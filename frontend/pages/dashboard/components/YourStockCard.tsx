@@ -20,34 +20,56 @@ const YourStockCard = (props: StockCardProps) => {
 
   const totalCoinsInvested = stockStats?.shares_owned * stockStats?.share_price;
 
+  const isBanned = stockStats?.is_banned;
+  const isInactive = !isBanned && !stockStats?.share_price;
+  const hideDetails = isBanned || isInactive;
+
   return (
     <Link href={"/stock/" + stockStats?.stock_id}>
       <div className="bg-violet-900 hover:bg-violet-950 p-5 w-full rounded-lg transition duration-300 overflow-clip">
-        <div className="flex flex-row items-start"> {/* Adjusted for alignment */}
+        <div className="flex flex-row items-start">
           <img
             src={stockStats?.osu_picture}
             className="rounded-full mr-5 h-16 w-16"
           />
-          <div className="flex flex-col justify-start"> {/* Adjusted for vertical alignment */}
+          <div className="flex flex-col justify-start">
+            {/* Adjusted for vertical alignment */}
             <h1 className="text-xl text-white font-semibold truncate">
               {stockStats?.osu_name}
-              <span className="font-normal text-lg"> &thinsp; (#{stockStats?.osu_rank})</span>
+              {!hideDetails && (
+                <span className="font-normal text-lg">
+                  &thinsp; (#{stockStats?.osu_rank})
+                </span>
+              )}
             </h1>
-            <div className="flex flex-row justify-start items-center text-base text-white">
-              {stockStats?.share_price}<FaCoins size={12} className="ml-2"/>
-              <span
-                style={{
-                  color: getColorForPercentage(
-                    stockStats?.share_price_change_percentage
-                  ),
-                }}
-              >
-                &emsp; {stockStats?.share_price_change_percentage + "%"}
-              </span>
-            </div>
-            <div className="flex flex-row justify-start items-center text-sm font-medium text-white">
-            {stockStats?.shares_owned} {stockStats?.shares_owned === 1 ? "Share" : "Shares"} = {totalCoinsInvested.toFixed(2)} <RiHandCoinFill size={12} className="ml-2"/>
-            </div>
+            {!hideDetails && (
+              <div className="flex flex-row justify-start items-center text-sm text-white">
+                {stockStats?.share_price}
+                <FaCoins size={12} className="ml-2" />
+                <span
+                  style={{
+                    color: getColorForPercentage(
+                      stockStats?.share_price_change_percentage
+                    ),
+                  }}
+                >
+                  &emsp; {stockStats?.share_price_change_percentage + "%"}
+                </span>
+              </div>
+            )}
+            {!hideDetails && (
+              <div className="flex flex-row justify-start items-center text-xs font-medium text-white">
+                {stockStats?.shares_owned}{" "}
+                {stockStats?.shares_owned === 1 ? "Share" : "Shares"} ={" "}
+                {totalCoinsInvested.toFixed(2)}{" "}
+                <RiHandCoinFill size={12} className="ml-2" />
+              </div>
+            )}
+            {hideDetails && (
+              <div className=" text-xs font-medium text-white">
+                {"This player is " + (isInactive ? "inactive" : "banned")}
+              </div>
+            )}
           </div>
         </div>
 

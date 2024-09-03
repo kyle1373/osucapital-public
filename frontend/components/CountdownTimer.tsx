@@ -40,7 +40,7 @@ const CountdownTimer: React.FC<CountdownTimerProps> = ({ targetDate }) => {
   };
 
   return (
-    <div className="mt-12">
+    <div className="">
       {Object.keys(timeLeft).length ? (
         <div>
           {/* <h1 className="font-semibold text-2xl mb-2 text-white">{TEXT.CurrentSeason + " starts soon!"}</h1> */}
