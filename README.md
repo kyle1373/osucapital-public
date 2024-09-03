@@ -1,11 +1,11 @@
-# osu-capital
+# osu-capital (public version)
 
-![image](https://github.com/kyle1373/osu-capital/assets/59634395/c4467abc-66f9-4f4d-9a1f-cc247b6d990c)
+This repo is a public, stale version of the actual codebase. The real codebase is private in a separate organization. The only reason why I have this code public is so recruiters and hiring managers can see my work.  
 
-![image](https://github.com/osucapital/website/assets/157181013/d6f8cbde-2cbf-4cc5-b158-fc5785bc64f3)
+![image](https://github.com/user-attachments/assets/3ecf7a6c-56c2-4001-91f1-dc014d4f7c0e)
 
+![image](https://github.com/user-attachments/assets/80525b20-20b6-4098-a713-b9a7d0037934)
 
-NOTE: This repo is changing frequently. Some documentation may be outdated. Contact `superfx64` (aka Kyle) on Discord if you see any.
 
 The codebase for osu! capital: a stock market for osu! players. Invest into osu! players with unconvertible currency where their share price is calculated through player performance statistics.
 
