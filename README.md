@@ -1,6 +1,6 @@
 # osu-capital (public version)
 
-This repo is a public, stale version of the actual codebase. The real codebase is private in a separate organization. The only reason why I have this code public is so recruiters and hiring managers can see my work.  
+This repo is a public, stale version of the actual codebase, which is made available so recruiters and hiring managers can see my work.  
 
 ![image](https://github.com/user-attachments/assets/3ecf7a6c-56c2-4001-91f1-dc014d4f7c0e)
 
